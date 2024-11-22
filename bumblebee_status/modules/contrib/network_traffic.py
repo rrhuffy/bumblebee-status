@@ -32,8 +32,8 @@ class Module(core.module.Module):
         ]
         super().__init__(config, theme, widgets)
 
-        self.widgets()[0].set("theme.minwidth", "0000000KiB/s")
-        self.widgets()[1].set("theme.minwidth", "0000000KiB/s")
+        self.widgets()[0].set("theme.minwidth", "100.000MiB/s")
+        self.widgets()[1].set("theme.minwidth", "100.000MiB/s")
 
         try:
             self._bandwidth = BandwidthInfo()
@@ -70,10 +70,10 @@ class Module(core.module.Module):
             pass
 
     def download_rate(self, _):
-        return "{}/s".format(util.format.byte(self._rate_recv))
+        return "{:7.3f}MiB/s".format(self._rate_recv/1024/1024)
 
     def upload_rate(self, _):
-        return "{}/s".format(util.format.byte(self._rate_sent))
+        return "{:7.3f}MiB/s".format(self._rate_sent/1024/1024)
 
 
 class BandwidthInfo(object):

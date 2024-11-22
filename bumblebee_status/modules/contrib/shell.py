@@ -41,8 +41,8 @@ class Module(core.module.Module):
         super().__init__(config, theme, core.widget.Widget(self.get_output))
 
         self.__command = self.parameter("command", 'echo "no command configured"')
-        self.__command = os.path.expanduser(self.__command)
         self.__async = util.format.asbool(self.parameter("async"))
+        self.__status = 0
 
         if self.__async:
             self.__output = "please wait..."
@@ -53,16 +53,20 @@ class Module(core.module.Module):
 
     def set_output(self, value):
         self.__output = value
-        core.event.trigger("update", [self.id], redraw_only=True)
 
     @core.decorators.scrollable
     def get_output(self, _):
-        return self.__output
+        if self.__status == 0:
+            return self.__output.replace('\033[0;33m', '').replace('\033[0;31m', '')
+        else:
+            return str(self.__status)
 
     def update(self):
         # if requested then run not async version and just execute command in this thread
         if not self.__async:
-            self.__output = util.cli.execute(self.__command, shell=True, ignore_errors=True).strip()
+            self.__status, self.__output = util.cli.execute(self.__command, shell=True, ignore_errors=True,
+                                                            return_exitcode=True)
+            self.__output = self.__output.strip()
             return
 
         # if previous thread didn't end yet then don't do anything
@@ -70,17 +74,26 @@ class Module(core.module.Module):
             return
 
         # spawn new thread to execute command and pass callback method to get output from it
+        def thread_command(thread_self):
+            thread_self.__status, thread_self.__output = util.cli.execute(thread_self.__command, shell=True,
+                                                                          ignore_errors=True,
+                                                                          return_exitcode=True)
+            thread_self.__output = thread_self.__output.strip()
+
         self.__current_thread = threading.Thread(
-            target=lambda obj, cmd: obj.set_output(
-                util.cli.execute(cmd, ignore_errors=True)
-            ),
-            args=(self, self.__command),
+            target=thread_command, args=(self,),
         )
         self.__current_thread.start()
 
     def state(self, _):
         if self.__output == "no command configured":
             return "warning"
-
+        if self.__output.startswith("\033[0;33m"):
+            return "warning"  # for yellow
+        if self.__output.startswith("\033[0;31m"):
+            return 'critical'  # for red
+        if self.__status > 0:
+            return "critical"
+        return ""
 
 # vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4
